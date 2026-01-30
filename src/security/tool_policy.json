@@ -1,0 +1,21 @@
+{
+  "roles": {
+    "researcher": {
+      "allowed_tools": ["think_tool", "web_search", "tavily_search", "ResearchComplete"],
+      "max_concurrent_calls": 3,
+      "rate_limit_per_minute": 30
+    },
+    "supervisor": {
+      "allowed_tools": ["think_tool", "web_search", "tavily_search", "ConductResearch", "ResearchComplete"],
+      "max_concurrent_calls": 6,
+      "rate_limit_per_minute": 60
+    },
+    "admin": {
+      "allowed_tools": ["*"],
+      "max_concurrent_calls": 50,
+      "rate_limit_per_minute": 1000
+    }
+  },
+  "default_role": "researcher",
+  "duplicate_window_seconds": 300
+}

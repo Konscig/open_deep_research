@@ -575,8 +575,8 @@ async def get_all_tools(config: RunnableConfig):
     Returns:
         List of all configured and available tools for research operations
     """
-    # Start with core research tools
-    tools = [tool(ResearchComplete), think_tool]
+    # Start with core research tools (think_tool excluded from global coordinator tools)
+    tools = [tool(ResearchComplete)]
     
     # Add configured search tools
     configurable = Configuration.from_runnable_config(config)
@@ -593,7 +593,15 @@ async def get_all_tools(config: RunnableConfig):
     # Add MCP tools if configured
     mcp_tools = await load_mcp_tools(config, existing_tool_names)
     tools.extend(mcp_tools)
-    
+
+    # Apply role-based filtering and other guardrails from security.validator
+    try:
+        from security.validator import filter_tools_by_role
+        tools = filter_tools_by_role(config, tools)
+    except Exception:
+        # If validator unavailable, return best-effort tool list
+        pass
+
     return tools
 
 def get_notes_from_tool_calls(messages: list[MessageLikeRepresentation]):

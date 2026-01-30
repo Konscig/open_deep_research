@@ -98,7 +98,79 @@ async def clarify_with_user(state: AgentState, config: RunnableConfig) -> Comman
         messages=get_buffer_string(messages), 
         date=get_today_str()
     )
-    response = await clarification_model.ainvoke([HumanMessage(content=prompt_content)])
+    # Validate structured-output conflicts before invoking model
+    try:
+        from security.validator import validate_structured_output_conflict
+        # Enforce that ClarifyWithUser and ResearchQuestion are not both strict in the same call
+        ok, reason = validate_structured_output_conflict([
+            {"type": "json_schema", "strict": True},
+            {"type": "json_schema", "strict": True}
+        ])
+    except Exception:
+        ok, reason = True, "ok"
+
+    if not ok:
+        # degrade to non-strict call — call model without structured output and attempt safe parse
+        raw_model = configurable_model.with_retry(stop_after_attempt=configurable.max_structured_output_retries).with_config(model_config)
+        raw_response = await raw_model.ainvoke([HumanMessage(content=prompt_content)])
+        # attempt to parse JSON result into expected shape
+        import json as _json
+        try:
+            parsed = _json.loads(str(raw_response.content))
+            # Map parsed dict to ClarifyWithUser-like attributes
+            need_clar = bool(parsed.get("need_clarification"))
+            question = parsed.get("question", "Can you clarify your request?")
+            verification = parsed.get("verification", "")
+            class _R: pass
+            r = _R()
+            r.need_clarification = need_clar
+            r.question = question
+            r.verification = verification
+            response = r
+        except Exception:
+            # If parsing fails, be conservative and ask for clarification
+            class _R: pass
+            r = _R()
+            r.need_clarification = True
+            r.question = "Could you clarify the scope and objectives of the research?"
+            r.verification = ""
+            response = r
+    else:
+        # Ensure we are not declaring multiple strict json_schema outputs in one call
+        try:
+            from security.validator import validate_structured_output_conflict
+            ok, reason = validate_structured_output_conflict([
+                {"type": "json_schema", "strict": True},
+                {"type": "json_schema", "strict": True}
+            ])
+        except Exception:
+            ok, reason = True, "ok"
+
+        if not ok:
+            # degrade to non-strict call
+            raw_model = configurable_model.with_retry(stop_after_attempt=configurable.max_structured_output_retries).with_config(model_config)
+            raw_response = await raw_model.ainvoke([HumanMessage(content=prompt_content)])
+            import json as _json
+            try:
+                parsed = _json.loads(str(raw_response.content))
+                need_clar = bool(parsed.get("need_clarification"))
+                question = parsed.get("question", "Can you clarify your request?")
+                verification = parsed.get("verification", "")
+                class _R: pass
+                r = _R()
+                r.need_clarification = need_clar
+                r.question = question
+                r.verification = verification
+                response = r
+            except Exception:
+                class _R: pass
+                r = _R()
+                r.need_clarification = True
+                r.question = "Could you clarify the scope and objectives of the research?"
+                r.verification = ""
+                response = r
+        else:
+            response = await clarification_model.ainvoke([HumanMessage(content=prompt_content)])
     
     # Step 4: Route based on clarification analysis
     if response.need_clarification:
@@ -139,12 +211,27 @@ async def write_research_brief(state: AgentState, config: RunnableConfig) -> Com
     }
     
     # Configure model for structured research question generation
-    research_model = (
-        configurable_model
-        .with_structured_output(ResearchQuestion)
-        .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
-        .with_config(research_model_config)
-    )
+    # Validate strict-schema conflicts before binding strict structured output
+    try:
+        from security.validator import validate_structured_output_conflict
+        ok, reason = validate_structured_output_conflict([{"type": "json_schema", "strict": True}])
+    except Exception:
+        ok, reason = True, "ok"
+
+    if ok:
+        research_model = (
+            configurable_model
+            .with_structured_output(ResearchQuestion)
+            .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
+            .with_config(research_model_config)
+        )
+    else:
+        # degrade to non-strict structured call
+        research_model = (
+            configurable_model
+            .with_retry(stop_after_attempt=configurable.max_structured_output_retries)
+            .with_config(research_model_config)
+        )
     
     # Step 2: Generate structured research brief from user messages
     prompt_content = transform_messages_into_research_topic_prompt.format(
@@ -198,8 +285,9 @@ async def supervisor(state: SupervisorState, config: RunnableConfig) -> Command[
         "tags": ["langsmith:nostream"]
     }
     
-    # Available tools: research delegation, completion signaling, and strategic thinking
-    lead_researcher_tools = [ConductResearch, ResearchComplete, think_tool]
+    # Available tools: research delegation and completion signaling
+    # NOTE: `think_tool` intentionally omitted from supervisor/coordinator to avoid user-facing model reasoning
+    lead_researcher_tools = [ConductResearch, ResearchComplete]
     
     # Configure model with tools, retry logic, and model settings
     research_model = (
@@ -243,16 +331,13 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
     research_iterations = state.get("research_iterations", 0)
     most_recent_message = supervisor_messages[-1]
     
-    # Define exit criteria for research phase
+    # Define exit criteria for research phase (do NOT auto-exit on ResearchComplete here;
+    # ResearchComplete will be validated after tool processing to ensure ConductResearch occurred)
     exceeded_allowed_iterations = research_iterations > configurable.max_researcher_iterations
     no_tool_calls = not most_recent_message.tool_calls
-    research_complete_tool_call = any(
-        tool_call["name"] == "ResearchComplete" 
-        for tool_call in most_recent_message.tool_calls
-    )
-    
-    # Exit if any termination condition is met
-    if exceeded_allowed_iterations or no_tool_calls or research_complete_tool_call:
+
+    # Exit early only if exceeded iterations or there are no tool calls
+    if exceeded_allowed_iterations or no_tool_calls:
         return Command(
             goto=END,
             update={
@@ -261,23 +346,11 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
             }
         )
     
-    # Step 2: Process all tool calls together (both think_tool and ConductResearch)
+    # Step 2: Process all tool calls together (only ConductResearch expected here)
     all_tool_messages = []
     update_payload = {"supervisor_messages": []}
     
-    # Handle think_tool calls (strategic reflection)
-    think_tool_calls = [
-        tool_call for tool_call in most_recent_message.tool_calls 
-        if tool_call["name"] == "think_tool"
-    ]
-    
-    for tool_call in think_tool_calls:
-        reflection_content = tool_call["args"]["reflection"]
-        all_tool_messages.append(ToolMessage(
-            content=f"Reflection recorded: {reflection_content}",
-            name="think_tool",
-            tool_call_id=tool_call["id"]
-        ))
+    # Note: think_tool calls are not processed at supervisor level anymore.
     
     # Handle ConductResearch calls (research delegation)
     conduct_research_calls = [
@@ -291,26 +364,62 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
             allowed_conduct_research_calls = conduct_research_calls[:configurable.max_concurrent_research_units]
             overflow_conduct_research_calls = conduct_research_calls[configurable.max_concurrent_research_units:]
             
-            # Execute research tasks in parallel
+            # Validate and execute research tasks in parallel. Block disallowed or duplicate calls.
+            from security.validator import validate_tool_call
+
+            validated_calls = []
+            existing_seen = state.get("seen_research_topics", []) or []
+            new_seen = []
+
+            for tool_call in allowed_conduct_research_calls:
+                # Extract research topic for deduplication
+                topic = None
+                try:
+                    topic = tool_call.get("args", {}).get("research_topic")
+                except Exception:
+                    topic = None
+
+                if topic and (topic in existing_seen or topic in new_seen):
+                    all_tool_messages.append(ToolMessage(
+                        content=f"Duplicate research topic suppressed: '{topic}'",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"]
+                    ))
+                    continue
+
+                allowed, reason = validate_tool_call(config, tool_call, messages=supervisor_messages, phase="research")
+                if not allowed:
+                    all_tool_messages.append(ToolMessage(
+                        content=f"Tool call blocked by policy: {reason}",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"]
+                    ))
+                else:
+                    validated_calls.append(tool_call)
+                    if topic:
+                        new_seen.append(topic)
+
             research_tasks = [
                 researcher_subgraph.ainvoke({
-                    "researcher_messages": [
-                        HumanMessage(content=tool_call["args"]["research_topic"])
-                    ],
+                    "researcher_messages": [HumanMessage(content=tool_call["args"]["research_topic"])],
                     "research_topic": tool_call["args"]["research_topic"]
-                }, config) 
-                for tool_call in allowed_conduct_research_calls
+                }, config)
+                for tool_call in validated_calls
             ]
             
             tool_results = await asyncio.gather(*research_tasks)
             
             # Create tool messages with research results
-            for observation, tool_call in zip(tool_results, allowed_conduct_research_calls):
+            for observation, tool_call in zip(tool_results, validated_calls):
                 all_tool_messages.append(ToolMessage(
                     content=observation.get("compressed_research", "Error synthesizing research report: Maximum retries exceeded"),
                     name=tool_call["name"],
                     tool_call_id=tool_call["id"]
                 ))
+
+            # mark that at least one successful ConductResearch occurred
+            if tool_results:
+                update_payload["conduct_research_successful"] = True
             
             # Handle overflow research calls with error messages
             for overflow_call in overflow_conduct_research_calls:
@@ -328,6 +437,10 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
             
             if raw_notes_concat:
                 update_payload["raw_notes"] = [raw_notes_concat]
+
+            # persist seen topics so future iterations can suppress duplicates
+            if new_seen:
+                update_payload["seen_research_topics"] = existing_seen + new_seen
                 
         except Exception as e:
             # Handle research execution errors
@@ -341,6 +454,24 @@ async def supervisor_tools(state: SupervisorState, config: RunnableConfig) -> Co
                     }
                 )
     
+    # After processing tool calls, validate any ResearchComplete tool call
+    research_complete_calls = [
+        tool_call for tool_call in most_recent_message.tool_calls 
+        if tool_call["name"] == "ResearchComplete"
+    ]
+
+    # If ResearchComplete was requested but no ConductResearch succeeded, block it
+    if research_complete_calls and not update_payload.get("conduct_research_successful"):
+        for rc in research_complete_calls:
+            all_tool_messages.append(ToolMessage(
+                content="Tool call blocked by policy: ResearchComplete not allowed before ConductResearch",
+                name="ResearchComplete",
+                tool_call_id=rc["id"]
+            ))
+    else:
+        # If allowed, preserve the ResearchComplete call messages (they may be processed by caller)
+        pass
+
     # Step 3: Return command with all tool results
     update_payload["supervisor_messages"] = all_tool_messages
     return Command(
@@ -382,6 +513,11 @@ async def researcher(state: ResearcherState, config: RunnableConfig) -> Command[
     
     # Get all available research tools (search, MCP, think_tool)
     tools = await get_all_tools(config)
+    # Allow think_tool only inside sandboxed researcher agents
+    try:
+        tools.append(think_tool)
+    except Exception:
+        pass
     if len(tools) == 0:
         raise ValueError(
             "No tools found to conduct research: Please configure either your "
@@ -424,10 +560,37 @@ async def researcher(state: ResearcherState, config: RunnableConfig) -> Command[
     )
 
 # Tool Execution Helper Function
-async def execute_tool_safely(tool, args, config):
-    """Safely execute a tool with error handling."""
+async def execute_tool_safely(tool, tool_call: dict, config, messages=None, phase: str = "research"):
+    """Safely execute a tool with pre-execution validation and error handling.
+
+    `tool_call` is the original tool call dict that contains `name`, `args`, and `id`.
+    The validator will decide whether the call is allowed; if not, a clear
+    ToolMessage-style string will be returned instead of executing the tool.
+    """
     try:
-        return await tool.ainvoke(args, config)
+        # Import validator lazily to avoid circular imports at module load
+        try:
+            from security.validator import validate_tool_call
+        except Exception:
+            validate_tool_call = None
+
+        if validate_tool_call:
+            allowed, reason = validate_tool_call(config, tool_call, messages, phase=phase)
+            if not allowed:
+                return f"Tool call blocked by policy: {reason}"
+
+        # Execute the tool (tools may be callables or structured tool objects)
+        # Tools can be functions or objects with `ainvoke`
+        if hasattr(tool, "ainvoke"):
+            return await tool.ainvoke(tool_call.get("args", {}), config)
+        elif callable(tool):
+            # sync or async callable
+            result = tool(**(tool_call.get("args", {})))
+            if hasattr(result, "__await__"):
+                return await result
+            return result
+
+        return f"Error executing tool: Unknown tool type '{type(tool)}'"
     except Exception as e:
         return f"Error executing tool: {str(e)}"
 
@@ -473,7 +636,13 @@ async def researcher_tools(state: ResearcherState, config: RunnableConfig) -> Co
     # Execute all tool calls in parallel
     tool_calls = most_recent_message.tool_calls
     tool_execution_tasks = [
-        execute_tool_safely(tools_by_name[tool_call["name"]], tool_call["args"], config) 
+        execute_tool_safely(
+            tools_by_name[tool_call["name"]],
+            tool_call,
+            config,
+            messages=researcher_messages,
+            phase="research",
+        )
         for tool_call in tool_calls
     ]
     observations = await asyncio.gather(*tool_execution_tasks)
@@ -646,6 +815,14 @@ async def final_report_generation(state: AgentState, config: RunnableConfig):
                 date=get_today_str()
             )
             
+            # Block any tool usage during final report generation: tools are prohibited in this phase
+            if filter_messages(state.get("messages", []), include_types="tool"):
+                return {
+                    "final_report": "Error: Tools are prohibited during final report generation. Please remove tool outputs before requesting the final report.",
+                    "messages": [AIMessage(content="Final report generation blocked due to tool outputs in state")],
+                    **cleared_state
+                }
+
             # Generate the final report
             final_report = await configurable_model.with_config(writer_model_config).ainvoke([
                 HumanMessage(content=final_report_prompt)
