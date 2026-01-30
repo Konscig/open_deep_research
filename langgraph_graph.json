@@ -1,0 +1,884 @@
+{
+  "nodes": [
+    {
+      "name": "supervisor",
+      "function_name": "supervisor",
+      "docstring": "Lead research supervisor that plans research strategy and delegates to researchers.\n\nThe supervisor analyzes the research brief and decides how to break down the research\ninto manageable tasks. It can use think_tool for strategic planning, ConductResearch\nto delegate tasks to sub-researchers, or ResearchComplete when satisfied with findings.\n\nArgs:\n    state: Current supervisor state with messages and research context\n    config: Runtime configuration with model settings\n    \nReturns:\n    Command to proceed to supervisor_tools for tool execution",
+      "node_type": "Router",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 356,
+        "col": 0,
+        "end_line": 356,
+        "end_col": 53
+      },
+      "metadata": {}
+    },
+    {
+      "name": "End",
+      "function_name": "Implicit END node",
+      "docstring": null,
+      "node_type": "Output",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "name": "supervisor_tools",
+      "function_name": "supervisor_tools",
+      "docstring": "Execute tools called by the supervisor, including research delegation and strategic thinking.\n\nThis function handles three types of supervisor tool calls:\n1. think_tool - Strategic reflection that continues the conversation\n2. ConductResearch - Delegates research tasks to sub-researchers\n3. ResearchComplete - Signals completion of research phase\n\nArgs:\n    state: Current supervisor state with messages and iteration count\n    config: Runtime configuration with research limits and model settings\n    \nReturns:\n    Command to either continue supervision loop or end research phase",
+      "node_type": "Tool",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 357,
+        "col": 0,
+        "end_line": 357,
+        "end_col": 65
+      },
+      "metadata": {}
+    },
+    {
+      "name": "Start",
+      "function_name": null,
+      "docstring": null,
+      "node_type": "Special",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "name": "researcher",
+      "function_name": "researcher",
+      "docstring": "Individual researcher that conducts focused research on specific topics.\n\nThis researcher is given a specific research topic by the supervisor and uses\navailable tools (search, think_tool, MCP tools) to gather comprehensive information.\nIt can use think_tool for strategic planning between searches.\n\nArgs:\n    state: Current researcher state with messages and topic context\n    config: Runtime configuration with model settings and tool availability\n    \nReturns:\n    Command to proceed to researcher_tools for tool execution",
+      "node_type": "Router",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 596,
+        "col": 0,
+        "end_line": 596,
+        "end_col": 53
+      },
+      "metadata": {}
+    },
+    {
+      "name": "researcher_tools",
+      "function_name": "researcher_tools",
+      "docstring": "Execute tools called by the researcher, including search tools and strategic thinking.\n\nThis function handles various types of researcher tool calls:\n1. think_tool - Strategic reflection that continues the research conversation\n2. Search tools (tavily_search, web_search) - Information gathering\n3. MCP tools - External tool integrations\n4. ResearchComplete - Signals completion of individual research task\n\nArgs:\n    state: Current researcher state with messages and iteration count\n    config: Runtime configuration with research limits and tool settings\n    \nReturns:\n    Command to either continue research loop or proceed to compression",
+      "node_type": "Tool",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 597,
+        "col": 0,
+        "end_line": 597,
+        "end_col": 65
+      },
+      "metadata": {}
+    },
+    {
+      "name": "compress_research",
+      "function_name": "compress_research",
+      "docstring": "Compress and synthesize research findings into a concise, structured summary.\n\nThis function takes all the research findings, tool outputs, and AI messages from\na researcher's work and distills them into a clean, comprehensive summary while\npreserving all important information and findings.\n\nArgs:\n    state: Current researcher state with accumulated research messages\n    config: Runtime configuration with compression model settings\n    \nReturns:\n    Dictionary containing compressed research summary and raw notes",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 598,
+        "col": 0,
+        "end_line": 598,
+        "end_col": 67
+      },
+      "metadata": {}
+    },
+    {
+      "name": "clarify_with_user",
+      "function_name": "clarify_with_user",
+      "docstring": "Analyze user messages and ask clarifying questions if the research scope is unclear.\n\nThis function determines whether the user's request needs clarification before proceeding\nwith research. If clarification is disabled or not needed, it proceeds directly to research.\n\nArgs:\n    state: Current agent state containing user messages\n    config: Runtime configuration with model settings and preferences\n    \nReturns:\n    Command to either end with a clarifying question or proceed to research brief",
+      "node_type": "Router",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 708,
+        "col": 0,
+        "end_line": 708,
+        "end_col": 72
+      },
+      "metadata": {}
+    },
+    {
+      "name": "write_research_brief",
+      "function_name": "write_research_brief",
+      "docstring": "Transform user messages into a structured research brief and initialize supervisor.\n\nThis function analyzes the user's messages and generates a focused research brief\nthat will guide the research supervisor. It also sets up the initial supervisor\ncontext with appropriate prompts and instructions.\n\nArgs:\n    state: Current agent state containing user messages\n    config: Runtime configuration with model settings\n    \nReturns:\n    Command to proceed to research supervisor with initialized context",
+      "node_type": "Router",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 709,
+        "col": 0,
+        "end_line": 709,
+        "end_col": 78
+      },
+      "metadata": {}
+    },
+    {
+      "name": "research_supervisor",
+      "function_name": "supervisor_subgraph",
+      "docstring": null,
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 710,
+        "col": 0,
+        "end_line": 710,
+        "end_col": 76
+      },
+      "metadata": {}
+    },
+    {
+      "name": "final_report_generation",
+      "function_name": "final_report_generation",
+      "docstring": "Generate the final comprehensive research report with retry logic for token limits.\n\nThis function takes all collected research findings and synthesizes them into a \nwell-structured, comprehensive final report using the configured report generation model.\n\nArgs:\n    state: Agent state containing research findings and context\n    config: Runtime configuration with model settings and API keys\n    \nReturns:\n    Dictionary containing the final report and cleared state",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/open_deep_research/deep_researcher.py",
+        "line": 711,
+        "col": 0,
+        "end_line": 711,
+        "end_col": 84
+      },
+      "metadata": {}
+    },
+    {
+      "name": "research_agent",
+      "function_name": "research_agent",
+      "docstring": "LLM decides whether to call a tool or not",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/multi_agent.py",
+        "line": 463,
+        "col": 0,
+        "end_line": 463,
+        "end_col": 59
+      },
+      "metadata": {}
+    },
+    {
+      "name": "research_agent_tools",
+      "function_name": "research_agent_tools",
+      "docstring": "Performs the tool call and route to supervisor or continue the research loop",
+      "node_type": "Tool",
+      "source_location": {
+        "file": "./src/legacy/multi_agent.py",
+        "line": 464,
+        "col": 0,
+        "end_line": 464,
+        "end_col": 71
+      },
+      "metadata": {}
+    },
+    {
+      "name": "research_team",
+      "function_name": "research_builder.compile",
+      "docstring": null,
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/multi_agent.py",
+        "line": 477,
+        "col": 0,
+        "end_line": 477,
+        "end_col": 72
+      },
+      "metadata": {}
+    },
+    {
+      "name": "generate_queries",
+      "function_name": "generate_queries",
+      "docstring": "Generate search queries for researching a specific section.\n\nThis node uses an LLM to generate targeted search queries based on the \nsection topic and description.\n\nArgs:\n    state: Current state containing section details\n    config: Configuration including number of queries to generate\n    \nReturns:\n    Dict containing the generated search queries",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 475,
+        "col": 0,
+        "end_line": 475,
+        "end_col": 62
+      },
+      "metadata": {}
+    },
+    {
+      "name": "search_web",
+      "function_name": "search_web",
+      "docstring": "Execute web searches for the section queries.\n\nThis node:\n1. Takes the generated queries\n2. Executes searches using configured search API\n3. Formats results into usable context\n\nArgs:\n    state: Current state with search queries\n    config: Search API configuration\n    \nReturns:\n    Dict with search results and updated iteration count",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 476,
+        "col": 0,
+        "end_line": 476,
+        "end_col": 50
+      },
+      "metadata": {}
+    },
+    {
+      "name": "write_section",
+      "function_name": "write_section",
+      "docstring": "Write a section of the report and evaluate if more research is needed.\n\nThis node:\n1. Writes section content using search results\n2. Evaluates the quality of the section\n3. Either:\n   - Completes the section if quality passes\n   - Triggers more research if quality fails\n\nArgs:\n    state: Current state with search results and section info\n    config: Configuration for writing and evaluation\n    \nReturns:\n    Command to either complete section or do more research",
+      "node_type": "Router",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 477,
+        "col": 0,
+        "end_line": 477,
+        "end_col": 56
+      },
+      "metadata": {}
+    },
+    {
+      "name": "generate_report_plan",
+      "function_name": "generate_report_plan",
+      "docstring": "Generate the initial report plan with sections.\n\nThis node:\n1. Gets configuration for the report structure and search parameters\n2. Generates search queries to gather context for planning\n3. Performs web searches using those queries\n4. Uses an LLM to generate a structured plan with sections\n\nArgs:\n    state: Current graph state containing the report topic\n    config: Configuration for models, search APIs, etc.\n    \nReturns:\n    Dict containing the generated sections",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 488,
+        "col": 0,
+        "end_line": 488,
+        "end_col": 62
+      },
+      "metadata": {}
+    },
+    {
+      "name": "human_feedback",
+      "function_name": "human_feedback",
+      "docstring": "Get human feedback on the report plan and route to next steps.\n\nThis node:\n1. Formats the current report plan for human review\n2. Gets feedback via an interrupt\n3. Routes to either:\n   - Section writing if plan is approved\n   - Plan regeneration if feedback is provided\n\nArgs:\n    state: Current graph state with sections to review\n    config: Configuration for the workflow\n    \nReturns:\n    Command to either regenerate plan or start section writing",
+      "node_type": "Router",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 489,
+        "col": 0,
+        "end_line": 489,
+        "end_col": 50
+      },
+      "metadata": {}
+    },
+    {
+      "name": "build_section_with_web_research",
+      "function_name": "section_builder.compile",
+      "docstring": null,
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 490,
+        "col": 0,
+        "end_line": 490,
+        "end_col": 78
+      },
+      "metadata": {}
+    },
+    {
+      "name": "gather_completed_sections",
+      "function_name": "gather_completed_sections",
+      "docstring": "Format completed sections as context for writing final sections.\n\nThis node takes all completed research sections and formats them into\na single context string for writing summary sections.\n\nArgs:\n    state: Current state with completed sections\n    \nReturns:\n    Dict with formatted sections as context",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 491,
+        "col": 0,
+        "end_line": 491,
+        "end_col": 72
+      },
+      "metadata": {}
+    },
+    {
+      "name": "write_final_sections",
+      "function_name": "write_final_sections",
+      "docstring": "Write sections that don't require research using completed sections as context.\n\nThis node handles sections like conclusions or summaries that build on\nthe researched sections rather than requiring direct research.\n\nArgs:\n    state: Current state with completed sections as context\n    config: Configuration for the writing model\n    \nReturns:\n    Dict containing the newly written section",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 492,
+        "col": 0,
+        "end_line": 492,
+        "end_col": 62
+      },
+      "metadata": {}
+    },
+    {
+      "name": "compile_final_report",
+      "function_name": "compile_final_report",
+      "docstring": "Compile all sections into the final report.\n\nThis node:\n1. Gets all completed sections\n2. Orders them according to original plan\n3. Combines them into the final report\n\nArgs:\n    state: Current state with all completed sections\n    \nReturns:\n    Dict containing the complete report",
+      "node_type": "Generic",
+      "source_location": {
+        "file": "./src/legacy/graph.py",
+        "line": 493,
+        "col": 0,
+        "end_line": 493,
+        "end_col": 62
+      },
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "Start",
+      "target": "clarify_with_user",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 714,
+          "col": 0,
+          "end_line": 714,
+          "end_col": 60
+        }
+      }
+    },
+    {
+      "source": "Start",
+      "target": "generate_queries",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 480,
+          "col": 0,
+          "end_line": 480,
+          "end_col": 51
+        }
+      }
+    },
+    {
+      "source": "Start",
+      "target": "generate_report_plan",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 496,
+          "col": 0,
+          "end_line": 496,
+          "end_col": 47
+        }
+      }
+    },
+    {
+      "source": "Start",
+      "target": "research_agent",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 465,
+          "col": 0,
+          "end_line": 465,
+          "end_col": 50
+        }
+      }
+    },
+    {
+      "source": "Start",
+      "target": "researcher",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 601,
+          "col": 0,
+          "end_line": 601,
+          "end_col": 48
+        }
+      }
+    },
+    {
+      "source": "Start",
+      "target": "supervisor",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 360,
+          "col": 0,
+          "end_line": 360,
+          "end_col": 48
+        }
+      }
+    },
+    {
+      "source": "Start",
+      "target": "supervisor",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 480,
+          "col": 0,
+          "end_line": 480,
+          "end_col": 48
+        }
+      }
+    },
+    {
+      "source": "build_section_with_web_research",
+      "target": "gather_completed_sections",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 498,
+          "col": 0,
+          "end_line": 498,
+          "end_col": 80
+        }
+      }
+    },
+    {
+      "source": "clarify_with_user",
+      "target": "End",
+      "condition": {
+        "type": "exit_point"
+      },
+      "metadata": {
+        "origin_function": "clarify_with_user",
+        "origin_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 106,
+          "col": 8,
+          "end_line": 109,
+          "end_col": 9
+        }
+      }
+    },
+    {
+      "source": "clarify_with_user",
+      "target": "write_research_brief",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "clarify_with_user",
+        "origin_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 112,
+          "col": 8,
+          "end_line": 115,
+          "end_col": 9
+        }
+      }
+    },
+    {
+      "source": "compile_final_report",
+      "target": "End",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 501,
+          "col": 0,
+          "end_line": 501,
+          "end_col": 45
+        }
+      }
+    },
+    {
+      "source": "compress_research",
+      "target": "End",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 602,
+          "col": 0,
+          "end_line": 602,
+          "end_col": 53
+        }
+      }
+    },
+    {
+      "source": "final_report_generation",
+      "target": "End",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 716,
+          "col": 0,
+          "end_line": 716,
+          "end_col": 64
+        }
+      }
+    },
+    {
+      "source": "gather_completed_sections",
+      "target": "write_final_sections",
+      "condition": {
+        "type": "conditional_map_list",
+        "value": null,
+        "condition_function": "initiate_final_section_writing"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 499,
+          "col": 0,
+          "end_line": 499,
+          "end_col": 116
+        }
+      }
+    },
+    {
+      "source": "generate_queries",
+      "target": "search_web",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 481,
+          "col": 0,
+          "end_line": 481,
+          "end_col": 58
+        }
+      }
+    },
+    {
+      "source": "generate_report_plan",
+      "target": "human_feedback",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 497,
+          "col": 0,
+          "end_line": 497,
+          "end_col": 58
+        }
+      }
+    },
+    {
+      "source": "human_feedback",
+      "target": "generate_report_plan",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "human_feedback",
+        "origin_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 189,
+          "col": 8,
+          "end_line": 190,
+          "end_col": 70
+        }
+      }
+    },
+    {
+      "source": "research_agent",
+      "target": "End",
+      "condition": {
+        "type": "conditional_map_list",
+        "value": null,
+        "condition_function": "research_agent_should_continue"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 466,
+          "col": 0,
+          "end_line": 470,
+          "end_col": 1
+        }
+      }
+    },
+    {
+      "source": "research_agent",
+      "target": "research_agent_tools",
+      "condition": {
+        "type": "conditional_map_list",
+        "value": null,
+        "condition_function": "research_agent_should_continue"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 466,
+          "col": 0,
+          "end_line": 470,
+          "end_col": 1
+        }
+      }
+    },
+    {
+      "source": "research_agent_tools",
+      "target": "research_agent",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 471,
+          "col": 0,
+          "end_line": 471,
+          "end_col": 67
+        }
+      }
+    },
+    {
+      "source": "research_supervisor",
+      "target": "final_report_generation",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 715,
+          "col": 0,
+          "end_line": 715,
+          "end_col": 82
+        }
+      }
+    },
+    {
+      "source": "research_team",
+      "target": "supervisor",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 486,
+          "col": 0,
+          "end_line": 486,
+          "end_col": 58
+        }
+      }
+    },
+    {
+      "source": "researcher",
+      "target": "researcher_tools",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "researcher",
+        "origin_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 418,
+          "col": 4,
+          "end_line": 424,
+          "end_col": 5
+        }
+      }
+    },
+    {
+      "source": "researcher_tools",
+      "target": "compress_research",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "researcher_tools",
+        "origin_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 500,
+          "col": 8,
+          "end_line": 503,
+          "end_col": 9
+        }
+      }
+    },
+    {
+      "source": "researcher_tools",
+      "target": "researcher",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "researcher_tools",
+        "origin_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 506,
+          "col": 4,
+          "end_line": 509,
+          "end_col": 5
+        }
+      }
+    },
+    {
+      "source": "search_web",
+      "target": "write_section",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 482,
+          "col": 0,
+          "end_line": 482,
+          "end_col": 55
+        }
+      }
+    },
+    {
+      "source": "supervisor",
+      "target": "End",
+      "condition": {
+        "type": "conditional_map_list",
+        "value": null,
+        "condition_function": "supervisor_should_continue"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 481,
+          "col": 0,
+          "end_line": 485,
+          "end_col": 1
+        }
+      }
+    },
+    {
+      "source": "supervisor",
+      "target": "supervisor_tools",
+      "condition": {
+        "type": "conditional_map_list",
+        "value": null,
+        "condition_function": "supervisor_should_continue"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 481,
+          "col": 0,
+          "end_line": 485,
+          "end_col": 1
+        }
+      }
+    },
+    {
+      "source": "supervisor_tools",
+      "target": "End",
+      "condition": {
+        "type": "exit_point"
+      },
+      "metadata": {
+        "origin_function": "supervisor_tools",
+        "origin_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 283,
+          "col": 12,
+          "end_line": 283,
+          "end_col": 65
+        }
+      }
+    },
+    {
+      "source": "supervisor_tools",
+      "target": "supervisor",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "supervisor_tools",
+        "origin_location": {
+          "file": "./src/legacy/multi_agent.py",
+          "line": 338,
+          "col": 4,
+          "end_line": 338,
+          "end_col": 58
+        }
+      }
+    },
+    {
+      "source": "write_final_sections",
+      "target": "compile_final_report",
+      "condition": {
+        "type": "static"
+      },
+      "metadata": {
+        "definition_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 500,
+          "col": 0,
+          "end_line": 500,
+          "end_col": 64
+        }
+      }
+    },
+    {
+      "source": "write_research_brief",
+      "target": "research_supervisor",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "write_research_brief",
+        "origin_location": {
+          "file": "./src/open_deep_research/deep_researcher.py",
+          "line": 163,
+          "col": 4,
+          "end_line": 175,
+          "end_col": 5
+        }
+      }
+    },
+    {
+      "source": "write_section",
+      "target": "End",
+      "condition": {
+        "type": "exit_point"
+      },
+      "metadata": {
+        "origin_function": "write_section",
+        "origin_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 347,
+          "col": 8,
+          "end_line": 347,
+          "end_col": 47
+        }
+      }
+    },
+    {
+      "source": "write_section",
+      "target": "search_web",
+      "condition": {
+        "type": "dynamic_goto"
+      },
+      "metadata": {
+        "origin_function": "write_section",
+        "origin_location": {
+          "file": "./src/legacy/graph.py",
+          "line": 351,
+          "col": 8,
+          "end_line": 354,
+          "end_col": 9
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "framework": "Langgraph"
+  }
+}
